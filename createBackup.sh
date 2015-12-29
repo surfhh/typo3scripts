@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # TYPO3 Installation Backup Script
-# written by Oliver Salzburg
+# originally written by Oliver Salzburg (thx!)
+# some adjustments by HH
 
 set -o nounset
 set -o errexit
@@ -40,6 +41,7 @@ function showHelp() {
                       database.
   --password=PASSWORD The password to use when connecting to the TYPO3
                       database.
+  --askpass           Asks for password interactively. Intended to be used instead of --password
   --database=DB       The name of the database in which TYPO3 is stored.
 EOF
 }
@@ -280,6 +282,10 @@ for option in $*; do
       ;;
     --password=*)
       PASS=$(echo $option | cut -d'=' -f2)
+      ;;
+    --askpass)
+      read -s -p "Please enter SQL DB password: " thePassword
+      PASS=$thePassword
       ;;
     --database=*)
       DB=$(echo $option | cut -d'=' -f2)
