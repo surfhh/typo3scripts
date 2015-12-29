@@ -242,7 +242,7 @@ if( file_exists( $CONFIG_FILENAME ) ) {
 foreach( $argv as $_option ) {
   if( $_option === $argv[ 0 ] ) continue;
 
-         if( $_option == "--verbose" ) {
+    if( $_option == "--verbose" ) {
     $VERBOSE = "true";
     
   } else if( $_option == "--quiet" ) {
@@ -259,7 +259,9 @@ foreach( $argv as $_option ) {
     exit( $returnValue );
 
   } else if( 0 === strpos( $_option, "--base=" ) ) {
+    global $BASE;
     $BASE = substr( $_option, strpos( $_option, "=" ) + 1 );
+    consoleWriteLine ("\$BASE was set to ". $BASE);
 
   } else if( $_option == "--export-config" ) {
     exportConfig();
@@ -298,11 +300,16 @@ if( "" != $GET_VARIABLE && "false" != $DUMP ) {
 
 function readConfiguration( $loadAdditional = true ) {
   // Grab main configuration
-  $GLOBALS[ "TYPO3_CONF_VARS" ] = require( "typo3/typo3conf/LocalConfiguration.php" );
+global $BASE;
+if ( !isset ($BASE) || empty($BASE) ) {
+  consoleWriteLine ("\$BASE is not set, exiting!");
+  die();
+}
+  $GLOBALS[ "TYPO3_CONF_VARS" ] = require( $BASE . "/typo3conf/LocalConfiguration.php" );
   
   if( $loadAdditional ) {
     // Grab additional configuration
-    $_additionalConfiguration = "typo3/typo3conf/AdditionalConfiguration.php";
+    $_additionalConfiguration = $BASE . "/typo3conf/AdditionalConfiguration.php";
     if( is_file( $_additionalConfiguration ) ) {
       require $_additionalConfiguration;
     }

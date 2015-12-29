@@ -24,6 +24,7 @@ function showHelp() {
   --extract-config    Extracts configuration parameters from TYPO3.
   --base=PATH         The name of the base path where TYPO3 is 
                       installed. If no base is supplied, "typo3" is used.
+  --destdir           The destination dir to put the files created by this script into
   
   Options:
   --skip-db           Skips dumping the database before creating the archive.
@@ -64,10 +65,10 @@ function extractConfig() {
       echo "Required 'configurationProxy.php' is missing.";
       exit 1
     fi
-    echo HOST=$(./configurationProxy.php --get=TYPO3_CONF_VARS.DB.host)
-    echo USER=$(./configurationProxy.php --get=TYPO3_CONF_VARS.DB.username)
-    echo PASS=$(./configurationProxy.php --get=TYPO3_CONF_VARS.DB.password)
-    echo DB=$(./configurationProxy.php --get=TYPO3_CONF_VARS.DB.database)
+    echo HOST=$(./configurationProxy.php --base=$BASE --get=TYPO3_CONF_VARS.DB.host)
+    echo USER=$(./configurationProxy.php --base=$BASE --get=TYPO3_CONF_VARS.DB.username)
+    echo PASS=$(./configurationProxy.php --base=$BASE --get=TYPO3_CONF_VARS.DB.password)
+    echo DB=$(./configurationProxy.php --base=$BASE --get=TYPO3_CONF_VARS.DB.database)
   else
     echo "Unable to find readable configuration file." >&2
   fi
@@ -90,6 +91,8 @@ QUIET=false
 FORCE=false
 # The base directory where TYPO3 is installed
 BASE=typo3
+# The destination directory the backup shall be placed into (default is .)
+DEST_DIR=.
 # The hostname of the MySQL server that TYPO3 uses
 HOST=localhost
 # The username used to connect to that MySQL server
@@ -266,6 +269,9 @@ for option in $*; do
     --base=*)
       BASE=$(echo $option | cut -d'=' -f2)
       ;;
+    --dest_dir=*)
+      DEST_DIR=$(echo $option | cut -d'=' -f2)
+      ;;
     --hostname=*)
       HOST=$(echo $option | cut -d'=' -f2)
       ;;
@@ -332,6 +338,20 @@ if [[ ! -r $BASE ]]; then
   exit 1
 fi
 
+# Does the dest_dir directory exist?
+if [[ ! -d $DEST_DIR ]]; then
+  consoleWriteLine "The dest_dir directory '$DEST_DIR' does not seem to exist, creating it!"
+  mkdir -p $DEST_DIR
+else
+  consoleWriteLine "The dest_dir directory '$DEST_DIR' does exist, remove it before calling this script!"
+  exit 1
+fi
+# Is the dest_dir directory readable?
+if [[ ! -r $DEST_DIR ]]; then
+  consoleWriteLine "The dest_dir directory '$DEST_DIR' is not readable!"
+  exit 1
+fi
+
 # Adding parameters to the filename
 PARAMS=""
 if [[ "true" == $SKIP_DB ]]; then
@@ -343,13 +363,15 @@ if [[ "true" == $SKIP_FS ]]; then
 fi
 
 # Filename for snapshot
-FILE=$BASE-$(date +%Y-%m-%d-%H-%M)$PARAMS.tgz
+FILE=$DEST_DIR/typo3-$(date +%Y-%m-%d-%H-%M)$PARAMS.tgz
+
+
 
 consoleWriteLine "Creating TYPO3 backup '$FILE'..."
 
 # Create database dump
 if [[ "false" == $SKIP_DB ]]; then
-  consoleWrite "Creating database dump at '$BASE/database.sql'..."
+  consoleWrite "Creating database dump at '$DEST_DIR/database.sql'..."
     
   _fullTables=()
   _bareTables=()
@@ -359,7 +381,7 @@ if [[ "false" == $SKIP_DB ]]; then
   # Are there tables for which to only export the table structure?
   if [[ ${#NO_DATA[@]} > 0 ]]; then
     # Get all table names
-    _tablesList=$BASE/database.sql.tables
+    _tablesList=$DEST_DIR/database.sql.tables
     set +e errexit
     _errorMessage=$(echo "SHOW TABLES;" | mysql --host=$HOST --user=$USER --password=$PASS $DB 2>&1 > $_tablesList)
     _status=$?
@@ -390,7 +412,7 @@ if [[ "false" == $SKIP_DB ]]; then
   fi
   
   set +e errexit
-  _errorMessage=$(mysqldump --host=$HOST --user=$USER --password=$PASS --add-drop-table --add-drop-database $_noDataTables $DB 2>&1 > $BASE/database.sql)
+  _errorMessage=$(mysqldump --host=$HOST --user=$USER --password=$PASS --add-drop-table --add-drop-database $_noDataTables $DB 2>&1 > $DEST_DIR/database.sql)
   _status=$?
   set -e errexit
   if [[ 0 < $_status ]]; then
@@ -406,7 +428,7 @@ if [[ "false" == $SKIP_DB ]]; then
     consoleWrite "Exporting structure for previously ignored tables..."
     
     set +e errexit
-    _errorMessage=$(mysqldump --host=$HOST --user=$USER --password=$PASS --add-drop-table --add-drop-database --no-data $_fullDataTables $DB 2>&1 >> $BASE/database.sql)
+    _errorMessage=$(mysqldump --host=$HOST --user=$USER --password=$PASS --add-drop-table --add-drop-database --no-data $_fullDataTables $DB 2>&1 >> $DEST_DIR/database.sql)
     _status=$?
     set -e errexit
     if [[ 0 < $_status ]]; then
@@ -441,7 +463,8 @@ else
 
   _excludes=
   _statusMessage="Compressing TYPO3 database..."
-  _compressionTarget=$BASE/database.sql
+  _compressionTarget=$DEST_DIR/database.sql
+# TODO HH 2015-12: In case full t3 install is compressed, the DB is not included in the tar anymore as it is not underneath the t3 directory file path
 fi
 
 consoleWrite $_statusMessage
