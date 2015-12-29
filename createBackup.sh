@@ -363,7 +363,8 @@ if [[ "true" == $SKIP_FS ]]; then
 fi
 
 # Filename for snapshot
-FILE=$DEST_DIR/typo3-$(date +%Y-%m-%d-%H-%M)$PARAMS.tgz
+FILENAME="typo3-$(date +%Y-%m-%d-%H-%M)$PARAMS.tgz"
+FILE="$DEST_DIR/$FILENAME"
 
 
 
@@ -490,6 +491,8 @@ else
     exit 1
   fi
 fi
+
+md5sum $FILE > "$DEST_DIR/$FILENAME.md5"
 
 consoleWriteLine "Done."
 
