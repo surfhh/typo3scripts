@@ -372,7 +372,12 @@ consoleWriteLine "Creating TYPO3 backup '$FILE'..."
 # Create database dump
 if [[ "false" == $SKIP_DB ]]; then
   consoleWrite "Creating database dump at '$DEST_DIR/database.sql'..."
-    
+  
+
+  _compressionTarget+=" $DEST_DIR/database.sql $DEST_DIR/database.sql.md5"
+
+  _statusMessage+=" [Typo3 SQL database]"
+  
   _fullTables=()
   _bareTables=()
   _noDataTables=
@@ -438,7 +443,10 @@ if [[ "false" == $SKIP_DB ]]; then
     fi
   fi
   consoleWriteLine "Done"
-  
+
+  #creating a hash of the DB
+  md5sum $DEST_DIR/database.sql > $DEST_DIR/database.sql.md5
+
 else
   consoleWriteLine "Skipping database export."
 fi
@@ -456,22 +464,19 @@ if [[ "false" == $SKIP_FS ]]; then
     done
   fi
   
-  _statusMessage="Compressing TYPO3 installation..."
-  _compressionTarget=$BASE
+  _compressionTarget+=" $BASE"
 
-else
 
-  _excludes=
-  _statusMessage="Compressing TYPO3 database..."
-  _compressionTarget=$DEST_DIR/database.sql
-# TODO HH 2015-12: In case full t3 install is compressed, the DB is not included in the tar anymore as it is not underneath the t3 directory file path
+  _statusMessage+=" [Typo3 installation]"
+
 fi
 
-consoleWrite $_statusMessage
+
+consoleWriteLine "Compressing $_statusMessage..."
 if hash pv 2>&- && hash gzip 2>&- && hash du 2>&-; then
   consoleWriteLine
   _dataSize=`du --summarize --bytes $_compressionTarget | cut --fields 1`
-  if ! tar --create $_excludes --file - $_compressionTarget | pv --progress --rate --bytes --size $_dataSize | gzip --best > $FILE; then
+  if ! tar -C $BASE --create $_excludes --file - $_compressionTarget | pv --progress --rate --bytes --size $_dataSize | gzip --best > $FILE; then
     consoleWriteLine "Failed!"
     exit 1
   fi
@@ -491,8 +496,9 @@ consoleWriteLine "Done."
 # Now that the database dump is packed up, delete it
 # We don't want to delete it if we never even exported it
 if [[ "false" == $SKIP_DB ]]; then
-  consoleWriteVerbose "Deleting database dump..."
-  rm --force -- $BASE/database.sql
+  consoleWriteVerbose "Deleting database dump and its md5 hash..."
+  rm --force -- $DEST_DIR/database.sql
+  rm --force -- $DEST_DIR/database.sql.md5
 fi
 consoleWriteLineVerbose "Done!"
 
